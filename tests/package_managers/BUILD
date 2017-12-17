@@ -6,6 +6,7 @@ load(
     "file_test",
 )
 load("//package_managers:download_pkgs.bzl", "download_pkgs")
+load("//package_managers:bootstrap_image.bzl", "bootstrap_image")
 load("//package_managers/apt_get:apt_get.bzl", "generate_apt_get")
 
 download_pkgs(
@@ -60,4 +61,10 @@ rule_test(
         "test_install_pkgs.tar",
     ],
     rule = "test_install_pkgs",
+)
+
+bootstrap_image(
+    name = "bootstrap_ubuntu",
+    store = "//store/fs:default_fs",
+    date = "2017/12/15",
 )
