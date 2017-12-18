@@ -15,30 +15,37 @@
 load("//store:store_provider.bzl", "store_provider")
 
 def _impl(ctx):
-  args = "--fs_root {fs_root} ".format(fs_root = ctx.attr.fs_root)
+    tool_path = ctx.expand_location("$(location //{0}:{1})".format(ctx.attr._tool.label.package, ctx.attr._tool.label.name))
+    args = "--fs_root {fs_root}".format(fs_root = ctx.attr.fs_root)
 
-  fs_provider = store_provider(
-    tool = ctx.executable._tool,
-    get_cmd = '--method get {0} --local_fs_file %GET --file %DEST'.format(args),
-    put_cmd = '--method put {0} --local_fs_file %PUT --file %SRC'.format(args),
-  )
+    fs_provider = store_provider(
+        tool =  tool_path,
+        get_cmd_args = [args, '--method get',  '--local_fs_file %GET', '--file %DEST'],
+        put_cmd_args = '--method put {0} --local_fs_file %PUT --file %SRC'.format(args),
+    )
 
-#  runfiles_dir = ctx.actions.declare_directory("{0}.runfiles".format(ctx.attr._tool.label.name), sibling=ctx.executable._tool)
-#  ctx.actions.run_shell(
-#      inputs=ctx.attr._tool.files.to_list(),
-#      outputs=[runfiles_dir],
-#      command = "cp  %s %s" %(ctx.attr._tool.files.to_list()[0].path, runfiles_dir.path)
-#  )
-  print(runfiles_dir.path)
-#  print(ctx.attr._tool.default_runfiles.files)
-  runfiles = ctx.runfiles(collect_default = True, files = ctx.attr._tool.default_runfiles.files.to_list())
-#  print(depset([ctx.executable._tool]) + ctx.attr._tool.files + ctx.attr._tool.default_runfiles.files.to_list())
+    runfiles = ctx.runfiles(collect_default = True, 
+                            files = ctx.attr._tool.default_runfiles.files.to_list() + [ctx.outputs.executable])
+    print(runfiles)
+#    ctx.file_action(ctx.outputs.executable,
+#                    "{tool_path} {args}".format(tool_path=tool_path,
+#                                                              args = args),
+#                    executable=True)
 
-  return struct(
-      files = depset([ctx.executable._tool]) + ctx.attr._tool.files + ctx.attr._tool.default_runfiles.files.to_list(),
-      runfiles = runfiles,
-      providers = [fs_provider],
-  )
+    ctx.actions.run_shell(
+        outputs = [ctx.outputs.executable,],
+        inputs = [ctx.executable._tool],
+        command = "cp %s %s" %(ctx.executable._tool.path, ctx.outputs.executable.path)
+    )
+    default_provider = DefaultInfo(files = depset([ctx.outputs.executable]),
+                                   default_runfiles = runfiles,
+                                   )
+
+    return struct(
+        #files = depset([ctx.executable._tool]),
+        #runfiles = runfiles,
+        providers = [fs_provider, default_provider],
+    )
 
 fs_store = rule(
     attrs = {
@@ -51,7 +58,12 @@ fs_store = rule(
              cfg = "host",
              executable = True,
              allow_files = True,
+        ),
+        "deps": attr.label_list(
+             default = [Label("//store/fs:fs")],
+             allow_files = True,
         )
     },
+    executable = True,
     implementation = _impl,
 )

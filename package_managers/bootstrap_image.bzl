@@ -23,20 +23,19 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build")
 def _impl(ctx):
     package_manager = ctx.attr.package_manager_generator[package_manager_provider]
     store = ctx.attr.store[store_provider]
-
     dest_artifact = ctx.actions.declare_file("{0}.tar".format(ctx.attr.name),
                                              sibling=ctx.outputs.executable)
-    get_cmd = store.get_cmd.replace("%GET", "{date}/packages.tar".format(date=ctx.attr.date)).replace("%DEST", dest_artifact.path)
+    status_file = ctx.actions.declare_file("{0}_get_status".format(ctx.attr.name))
+
+    get_cmd = ' '.join(store.get_cmd_args).replace("%GET", "{date}/packages.tar".format(date=ctx.attr.date)).replace("%DEST", dest_artifact.path)
     ctx.action(
-        outputs = [ctx.outputs.executable, dest_artifact],
-        executable = store.tool,
-        arguments=[
-            get_cmd
-        ],
+        outputs = [ctx.outputs.executable, dest_artifact, status_file],
+        executable = ctx.executable.store,
+        arguments= get_cmd.split(' ') + [ '--operation_status', status_file.path],
         use_default_shell_env=True,
         mnemonic="GetArtifact"
     )
-    print(ctx.attr.store.default_runfiles.files.to_list()[0].path)
+    ctx.
     return struct(
         runfiles = ctx.runfiles(files = [ctx.file.image_tar,] + ctx.attr.store.default_runfiles.files.to_list()),
         files = depset([ctx.outputs.executable])
@@ -61,6 +60,7 @@ bootstrap_image = rule(
            cfg = "target",
            allow_files = True,
            providers = [store_provider],
+           executable = True,
        ),
        "date": attr.string(),
        # TODO: (tejaldesai) Add this in
@@ -84,7 +84,7 @@ Args:
   additional_repos: list of additional debian package repos to use, in sources.list format
 """
 
-def bootstrap_imagesi_macro(name, image_tar, package_manager_generator, store, date, additional_repos=[]):
+def bootstrap_image_macro(name, image_tar, package_manager_generator, store, date, additional_repos=[]):
   """Downloads packages within a container
   This rule creates a script to download packages within a container.
   The script bunldes all the packages in a tarball.
@@ -103,21 +103,16 @@ def bootstrap_imagesi_macro(name, image_tar, package_manager_generator, store, d
   tars = []
   if additional_repos:
     repo_name="{0}_repos".format(name)
-#    generate_additional_repos(
-#        name = repo_name,
-#        repos = additional_repos
-#   )
+    generate_additional_repos(
+        name = repo_name,
+        repos = additional_repos
+   )
     tars.append("%s.tar" % repo_name)
 
 
   img_target_name = "{0}_build".format(name)
-#  docker_build(
-#        name = img_target_name,
-#        base = image_tar,
-#        tars = tars,
-#  )
-#  _download_pkgs(
-#       name = "{0}".format(name),
-#       package_manager_generator = package_manager_generator,
-#       image_tar = ":{0}.tar".format(img_target_name),
-#  )
+  download_pkgs(
+       name = "{0}".format(name),
+       package_manager_generator = package_manager_generator,
+       image_tar = ":{0}.tar".format(img_target_name),
+  )

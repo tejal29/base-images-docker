@@ -99,6 +99,8 @@ class LocalFSStore(object):
 
   def get(self):
     """Get file and copy it to bazel workspace"""
+    if not self._store_exists():
+       return
     with self.ch_root():
        self._execute(commands = [
            ['ls', self.local_fs_file],
@@ -129,4 +131,5 @@ def main(unused_argv):
       raise LocalFSStore.LocalFSStoreError(FLAGS.method, "Method not found")
 
 if __name__ == '__main__':
+  print(sys.argv)
   main(FLAGS(sys.argv))
