@@ -6,7 +6,7 @@ load(
     "file_test",
 )
 load("//package_managers:download_pkgs.bzl", "download_pkgs")
-load("//package_managers:bootstrap_image.bzl", "bootstrap_image")
+load("//package_managers:bootstrap_image.bzl", "bootstrap_image", "bootstrap_image_macro",)
 load("//package_managers/apt_get:apt_get.bzl", "generate_apt_get")
 
 download_pkgs(
@@ -63,8 +63,11 @@ rule_test(
     rule = "test_install_pkgs",
 )
 
-bootstrap_image(
+bootstrap_image_macro(
     name = "bootstrap_ubuntu",
     store = "//store/fs:default_fs",
     date = "2017/12/15",
+    image_tar = "//ubuntu:ubuntu_16_0_4_vanilla.tar",
+    package_manager_generator = "//package_managers/apt_get:default_docker_packages",
+    output_image_name = "unbuntu",
 )

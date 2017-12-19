@@ -28,5 +28,5 @@ py_binary(
 
 fs_store(
     name = "default_fs",
-    fs_root = "/usr/local/tejaldesai/builds",
+    fs_root = "/usr/local/google/home/tejaldesai/builds",
 )

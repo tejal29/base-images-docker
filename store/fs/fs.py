@@ -51,20 +51,24 @@ class LocalFSStore(object):
       return 'Method {0} failed due to {1}'.format(self.method, self.message)
 
 
-  def __init__(self, fs_root, local_fs_file, file, operation_status):
+  def __init__(self, fs_root, local_fs_file, file, operation_status, method):
      self.fs_root = fs_root
      self.file = file
      self.local_fs_file = local_fs_file
      self.operation_stats = operation_status
+     self.method = method
 
   def __enter__(self):
-     self.status_file = open(self.operation_stats, 'w')
-     self.STATUS_CODE = 0
+     if self.operation_stats:
+       self.status_file = open(self.operation_stats, 'w')
+       self.STATUS_CODE = 0
      return self
 
   def __exit__(self, t, v, traceback):
-    self.status_file.write("{0}".format(self.STATUS_CODE))
-    self.status_file.close()
+    if self.operation_stats:
+      self.status_file.write("{0}".format(self.STATUS_CODE))
+      print(self.status_file)
+      self.status_file.close()
 
   @contextmanager
   def ch_root(self):
@@ -79,10 +83,10 @@ class LocalFSStore(object):
   def _execute(self, commands):
     try:
      for command in commands:
-       subprocess.call(command)
+       subprocess.check_output(command)
     except subprocess.CalledProcessError as e:
       self.STATUS_CODE = e.returncode
-      raise LocalFSStore.LocalFSStoreError(self.method, e)
+      #raise LocalFSStore.LocalFSStoreError(self.method, e)
 
   def init(self):
     "Create the local file system store if it does not exists"
@@ -106,6 +110,7 @@ class LocalFSStore(object):
            ['ls', self.local_fs_file],
            ['cp', self.local_fs_file, self.file]
        ])
+       print("getting")
 
   def put(self):
     """Put file from Bazel workspace to local file system"""
@@ -116,10 +121,10 @@ class LocalFSStore(object):
 
 def main(unused_argv):
   with LocalFSStore(fs_root=FLAGS.fs_root,
-                     file=FLAGS.file,
-                     local_fs_file=FLAGS.local_fs_file,
-                    operation_status=FLAGS.operation_status) as fs_store:
-    print(FLAGS.method)
+                    file=FLAGS.file,
+                    local_fs_file=FLAGS.local_fs_file,
+                    operation_status=FLAGS.operation_status,
+                    method = FLAGS.method) as fs_store:
     if FLAGS.method == "get":
        fs_store.get()
     elif FLAGS.method == "put":
