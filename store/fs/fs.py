@@ -30,7 +30,7 @@ gflags.DEFINE_string('operation_status', None, 'The File to write the status ope
 gflags.MarkFlagAsRequired('file')
 gflags.MarkFlagAsRequired('local_fs_file')
 gflags.MarkFlagAsRequired('fs_root')
-gflags.MarkFlagAsRequired('operation_status')
+#gflags.MarkFlagAsRequired('operation_status')
 
 
 FLAGS = gflags.FLAGS

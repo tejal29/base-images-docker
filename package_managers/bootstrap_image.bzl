@@ -14,8 +14,6 @@
 
 """Rule for bootstrapping an image from using download_pkgs and install_pkgs """
 
-#load("//package_managers:download_pkgs.bzl", "download_pkgs")
-#load("//package_managers:install_pkgs.bzl", "install_pkgs")
 load("//package_managers:package_manager_provider.bzl", "package_manager_provider")
 load("//store:store_provider.bzl", "store_provider")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build")
@@ -26,28 +24,42 @@ load("//package_managers:install_pkgs.bzl", "install_pkgs")
 
 
 def _impl(ctx):
-  print(dir(ctx.attr.get))
-  ctx.actions.write(
-      output = ctx.outputs.executable,
-      content = "echo {0}".format(ctx.attr.get.files.to_list()[0].path),
-      is_executable = True, 
-  )
-
-def _get_impl(ctx):
     store = ctx.attr.store[store_provider]
-#    dest_artifact = ctx.actions.declare_file("{0}.tar".format(ctx.attr.name))
+        
+    get_cmd = ' '.join(store.get_cmd_args).replace("%GET", "{date}/packages.tar".format(date=ctx.attr.date)).replace("%DEST", ctx.outputs.executable.path)
 
-    get_cmd = ' '.join(store.get_cmd_args).replace("%GET", "{date}/packages.tar".format(date=ctx.attr.date)).replace("%DEST", ctx.outputs.artifact.path)
-    ctx.actions.run(
-        outputs = [ctx.outputs.artifact, ], 
-        executable = ctx.executable.store,
-        arguments= get_cmd.split(' '),
-        use_default_shell_env=True,
-        mnemonic="GetArtifact"
+    build_contents = """
+set -ex
+echo `pwd`
+{store_get} {args}
+
+if [ ! -f "{DEST}" ]; then
+  {download_pkgs_executable}
+fi
+""".format(store_get = ctx.executable.store.short_path, 
+           args = get_cmd, 
+           download_pkgs_executable = ctx.executable.download_pkgs.path,
+           DEST = ctx.outputs.executable.path,
     )
+
+    ctx.actions.write( 
+        output = ctx.outputs.executable,
+        content = build_contents,
+        is_executable = True,
+    )
+
+#    ctx.actions.run(
+#        outputs = [ctx.outputs.executable, ], 
+#        executable = ctx.executable.store,
+#        arguments= get_cmd.split(' '),
+#        use_default_shell_env=True,
+#        mnemonic="GetArtifact"
+#    )
+    print(ctx.attr.store.files)
     return struct(
-        runfiles = ctx.runfiles(files = ctx.attr.store.default_runfiles.files.to_list()),
-        files = depset([ctx.outputs.artifact])
+        runfiles = ctx.runfiles(files = ctx.attr.store.default_runfiles.files.to_list() + 
+                                        [ctx.executable.store, ctx.executable.download_pkgs]),
+        files = depset([ctx.outputs.executable])
     )
 
 bootstrap_image = rule(
@@ -82,11 +94,12 @@ bootstrap_image = rule(
            providers = [store_provider],
            executable = True,
        ),
-       "get": attr.label(
-           cfg = "target",
-           allow_files = True,
+#       "get": attr.label(
+#           cfg = "target",
+#           allow_files = True,
 #           executable = True,
-       ), 
+#       ),
+       "date": attr.string(), 
        # TODO: (tejaldesai) Add this in
        # "additional_repos": attr.string_list(),
     },
@@ -95,24 +108,24 @@ bootstrap_image = rule(
 )
 
 
-_get_artifact_from_store = rule(
-   attrs = {
-       "store": attr.label(
-           cfg = "target",
-           allow_files = True,
-           providers = [store_provider],
-           executable = True,
-       ),
-       "date": attr.string(),
-       # TODO: (tejaldesai) Add this in
-       # "additional_repos": attr.string_list(),
-    },
+#_get_artifact_from_store = rule(
+#   attrs = {
+#       "store": attr.label(
+#           cfg = "target",
+#           allow_files = True,
+#           providers = [store_provider],
+#           executable = True,
+#       ),
+#       "date": attr.string(),
+#       # TODO: (tejaldesai) Add this in
+#       # "additional_repos": attr.string_list(),
+#    },
 #    executable = True, 
-    implementation = _get_impl,
-    outputs = {
-      "artifact": "%{name}.tar",
-    }
-)
+#    implementation = _get_impl,
+#    outputs = {
+#      "artifact": "%{name}.tar",
+#    }
+#)
 
 
 
@@ -166,11 +179,11 @@ def bootstrap_image_macro(name, image_tar, package_manager_generator, store, dat
       output_image_name = output_image_name,
       package_manager_generator = package_manager_generator,
   )
-  _get_artifact_from_store(
-     name = "{0}_get".format(name),
-     store = store,
-     date = date,
-   )
+#  _get_artifact_from_store(
+#     name = "{0}_get".format(name),
+#     store = store,
+#     date = date,
+#   )
 
   bootstrap_image(
       name = "{0}_boot".format(name),
@@ -178,5 +191,5 @@ def bootstrap_image_macro(name, image_tar, package_manager_generator, store, dat
       download_pkgs = ":{0}_download".format(name),
       install_pkgs = ":{0}_install".format(name),
       store = store,
-      get = ":{0}_get".format(name)
+#      get = ":{0}_get".format(name)
   )
